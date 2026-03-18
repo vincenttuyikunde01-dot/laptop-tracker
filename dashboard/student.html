@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>UR Laptop Tracker — Student Portal</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f1117; --bg2: #1a1d27; --bg3: #22263a;
+      --border: rgba(255,255,255,0.08); --text: #f0f2f8;
+      --muted: #7a80a0; --accent: #4f8ef7; --danger: #f04a4a;
+      --success: #2dcf8a; --warning: #f5a623;
+    }
+    body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', system-ui, sans-serif; font-size: 14px; min-height: 100vh; }
+
+    /* ── AUTH SCREEN ── */
+    .auth-screen { min-height: 100vh; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .auth-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 40px; width: 100%; max-width: 400px; }
+    .auth-logo { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+    .logo { width: 36px; height: 36px; background: var(--accent); border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 16px; font-weight: 700; color: #fff; }
+    .auth-title { font-size: 20px; font-weight: 600; }
+    .auth-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; font-weight: 500; letter-spacing: 0.3px; }
+    .field input { width: 100%; padding: 10px 14px; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 14px; outline: none; transition: border 0.15s; }
+    .field input:focus { border-color: var(--accent); }
+    .btn-login { width: 100%; padding: 11px; background: var(--accent); border: none; border-radius: 8px; color: #fff; font-size: 14px; font-weight: 600; cursor: pointer; margin-top: 8px; transition: opacity 0.15s; }
+    .btn-login:hover { opacity: 0.9; }
+    .auth-toggle { text-align: center; margin-top: 20px; font-size: 13px; color: var(--muted); }
+    .auth-toggle a { color: var(--accent); cursor: pointer; text-decoration: none; }
+    .error-msg { background: rgba(240,74,74,0.12); border: 1px solid rgba(240,74,74,0.3); color: var(--danger); border-radius: 8px; padding: 10px 14px; font-size: 13px; margin-bottom: 16px; display: none; }
+
+    /* ── APP SCREEN ── */
+    .app-screen { display: none; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; padding: 0 24px; height: 56px; background: var(--bg2); border-bottom: 1px solid var(--border); }
+    .topbar-left { display: flex; align-items: center; gap: 12px; }
+    .topbar-right { display: flex; align-items: center; gap: 12px; }
+    .topbar h1 { font-size: 15px; font-weight: 600; }
+    .topbar-sub { font-size: 12px; color: var(--muted); }
+    .btn-logout { padding: 6px 14px; background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 12px; cursor: pointer; }
+    .btn-logout:hover { border-color: var(--danger); color: var(--danger); }
+
+    .content { max-width: 900px; margin: 0 auto; padding: 28px 24px; }
+
+    .laptop-hero { background: var(--bg2); border: 1px solid var(--border); border-radius: 16px; padding: 28px; margin-bottom: 20px; display: flex; align-items: center; gap: 24px; }
+    .laptop-icon { width: 72px; height: 72px; background: var(--bg3); border-radius: 14px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .laptop-icon svg { width: 36px; height: 36px; }
+    .laptop-info h2 { font-size: 20px; font-weight: 600; margin-bottom: 4px; }
+    .laptop-info p { font-size: 13px; color: var(--muted); }
+    .status-chip { display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; margin-top: 10px; }
+    .chip-safe { background: rgba(45,207,138,0.12); color: var(--success); border: 1px solid rgba(45,207,138,0.25); }
+    .chip-stolen { background: rgba(240,74,74,0.12); color: var(--danger); border: 1px solid rgba(240,74,74,0.25); }
+    .chip-offline { background: rgba(122,128,160,0.12); color: var(--muted); border: 1px solid rgba(122,128,160,0.25); }
+    .pulsedot { width: 7px; height: 7px; border-radius: 50%; background: currentColor; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+    .card { background: var(--bg2); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+    .card-title { font-size: 11px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.7px; margin-bottom: 16px; }
+    .info-row { display: flex; justify-content: space-between; font-size: 13px; margin-bottom: 10px; }
+    .info-row:last-child { margin-bottom: 0; }
+    .info-key { color: var(--muted); }
+    .info-val { font-weight: 500; }
+
+    #studentMap { width: 100%; height: 220px; border-radius: 8px; overflow: hidden; margin-top: 12px; }
+
+    .card-title-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+    .full-card { margin-bottom: 20px; }
+
+    .btn-danger { width: 100%; padding: 11px; background: rgba(240,74,74,0.12); border: 1px solid rgba(240,74,74,0.3); border-radius: 8px; color: var(--danger); font-size: 14px; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.15s; }
+    .btn-danger:hover { background: rgba(240,74,74,0.2); }
+    .btn-disabled { opacity: 0.5; pointer-events: none; }
+    .report-form { display: none; margin-top: 16px; }
+    .report-form textarea { width: 100%; background: var(--bg3); border: 1px solid var(--border); border-radius: 8px; color: var(--text); font-size: 13px; padding: 10px 14px; resize: vertical; min-height: 80px; outline: none; }
+    .report-form textarea:focus { border-color: var(--accent); }
+    .btn-submit { margin-top: 10px; padding: 10px 20px; background: var(--danger); border: none; border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-cancel { margin-top: 10px; margin-left: 8px; padding: 10px 20px; background: none; border: 1px solid var(--border); border-radius: 8px; color: var(--muted); font-size: 13px; cursor: pointer; }
+
+    .ping-item { display: flex; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--border); font-size: 13px; align-items: flex-start; }
+    .ping-item:last-child { border-bottom: none; }
+    .ping-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--success); flex-shrink: 0; margin-top: 4px; }
+    .ping-dot.bad { background: var(--danger); }
+    .ping-info { flex: 1; }
+    .ping-loc { font-weight: 500; }
+    .ping-details { font-size: 11px; color: var(--muted); margin-top: 2px; }
+    .ping-time { font-size: 11px; color: var(--muted); white-space: nowrap; }
+
+    .toast { position: fixed; bottom: 24px; right: 24px; background: var(--bg2); border: 1px solid var(--border); border-radius: 10px; padding: 14px 18px; font-size: 13px; z-index: 999; animation: slideUp 0.2s ease; max-width: 320px; }
+    .toast.danger { border-left: 3px solid var(--danger); }
+    .toast.success { border-left: 3px solid var(--success); }
+    @keyframes slideUp { from{transform:translateY(10px);opacity:0} to{transform:translateY(0);opacity:1} }
+  </style>
+</head>
+<body>
+
+<!-- AUTH SCREEN -->
+<div class="auth-screen" id="authScreen">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="logo">UR</div>
+      <div>
+        <div class="auth-title">Laptop Tracker</div>
+        <div class="auth-sub">University of Rwanda</div>
+      </div>
+    </div>
+    <div class="error-msg" id="errorMsg"></div>
+    <div id="loginForm">
+      <div class="field"><label>Email Address</label><input type="email" id="loginEmail" placeholder="yourname@ur.ac.rw" /></div>
+      <div class="field"><label>Password</label><input type="password" id="loginPassword" placeholder="••••••••" /></div>
+      <button class="btn-login" onclick="doLogin()">Sign In</button>
+      <div class="auth-toggle">Don't have an account? <a onclick="showRegister()">Register here</a></div>
+    </div>
+    <div id="registerForm" style="display:none">
+      <div class="field"><label>Full Name</label><input type="text" id="regName" placeholder="Jean Paul Hakizimana" /></div>
+      <div class="field"><label>Student ID</label><input type="text" id="regStudentId" placeholder="UR/CST/2021/001" /></div>
+      <div class="field"><label>Email</label><input type="email" id="regEmail" placeholder="yourname@ur.ac.rw" /></div>
+      <div class="field"><label>College</label><input type="text" id="regCollege" placeholder="College of Science and Technology" /></div>
+      <div class="field"><label>Password</label><input type="password" id="regPassword" placeholder="Create a password" /></div>
+      <button class="btn-login" onclick="doRegister()">Create Account</button>
+      <div class="auth-toggle">Already have an account? <a onclick="showLogin()">Sign in</a></div>
+    </div>
+  </div>
+</div>
+
+<!-- APP SCREEN -->
+<div class="app-screen" id="appScreen">
+  <div class="topbar">
+    <div class="topbar-left">
+      <div class="logo">UR</div>
+      <div>
+        <div class="topbar h1" style="font-size:15px;font-weight:600;">My Laptop</div>
+        <div class="topbar-sub" id="topbarStudentName">Student Portal</div>
+      </div>
+    </div>
+    <div class="topbar-right">
+      <button class="btn-logout" onclick="doLogout()">Sign out</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <!-- HERO -->
+    <div class="laptop-hero" id="laptopHero">
+      <div class="laptop-icon">
+        <svg fill="none" stroke="var(--accent)" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="13" rx="2"/><path d="M8 21h8M12 17v4"/></svg>
+      </div>
+      <div class="laptop-info">
+        <h2 id="heroModel">Loading...</h2>
+        <p id="heroSerial">Serial number</p>
+        <div class="status-chip chip-safe" id="heroStatus"><span class="pulsedot"></span> Loading...</div>
+      </div>
+    </div>
+
+    <!-- INFO GRID -->
+    <div class="grid2">
+      <div class="card">
+        <div class="card-title">Last Location</div>
+        <div class="info-row"><span class="info-key">City</span><span class="info-val" id="infoCity">—</span></div>
+        <div class="info-row"><span class="info-key">Country</span><span class="info-val" id="infoCountry">—</span></div>
+        <div class="info-row"><span class="info-key">IP Address</span><span class="info-val" id="infoIP">—</span></div>
+        <div class="info-row"><span class="info-key">WiFi</span><span class="info-val" id="infoWifi">—</span></div>
+        <div class="info-row"><span class="info-key">Last Seen</span><span class="info-val" id="infoLastSeen">—</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">Device Info</div>
+        <div class="info-row"><span class="info-key">Brand</span><span class="info-val" id="infoBrand">—</span></div>
+        <div class="info-row"><span class="info-key">Model</span><span class="info-val" id="infoModel">—</span></div>
+        <div class="info-row"><span class="info-key">Serial</span><span class="info-val" id="infoSerial">—</span></div>
+        <div class="info-row"><span class="info-key">OS User</span><span class="info-val" id="infoOsUser">—</span></div>
+        <div class="info-row"><span class="info-key">Registered</span><span class="info-val" id="infoRegistered">—</span></div>
+      </div>
+    </div>
+
+    <!-- MAP -->
+    <div class="card full-card">
+      <div class="card-title">Last Known Location on Map</div>
+      <div id="studentMap"></div>
+    </div>
+
+    <!-- PING HISTORY -->
+    <div class="card full-card">
+      <div class="card-title-row">
+        <div class="card-title" style="margin-bottom:0">Recent Pings</div>
+        <span style="font-size:11px;color:var(--muted)">Last 5 locations</span>
+      </div>
+      <div id="pingHistory">
+        <div style="color:var(--muted);font-size:13px;padding:12px 0">Loading ping history...</div>
+      </div>
+    </div>
+
+    <!-- REPORT STOLEN -->
+    <div class="card full-card" id="reportCard">
+      <div class="card-title">Report Laptop Stolen</div>
+      <p style="font-size:13px;color:var(--muted);margin-bottom:16px">If your laptop was stolen, report it here. This activates live tracking and generates an evidence report for the university.</p>
+      <button class="btn-danger" id="reportBtn" onclick="toggleReportForm()">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+        Report My Laptop Stolen
+      </button>
+      <div class="report-form" id="reportForm">
+        <textarea id="reportDescription" placeholder="Describe what happened (when, where, how it was stolen)..."></textarea>
+        <input type="text" id="reportLastLocation" placeholder="Last place you had the laptop" style="width:100%;background:var(--bg3);border:1px solid var(--border);border-radius:8px;color:var(--text);font-size:13px;padding:10px 14px;outline:none;margin-top:8px;" />
+        <div>
+          <button class="btn-submit" onclick="submitReport()">Submit Report</button>
+          <button class="btn-cancel" onclick="toggleReportForm()">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const API_URL = 'https://ur-laptop-tracker.onrender.com/api';
+let token = localStorage.getItem('student_token');
+let currentStudent = JSON.parse(localStorage.getItem('student_info') || 'null');
+let studentMap, studentMarker;
+
+// ── DEMO DATA ──
+const DEMO_LAPTOP = {
+  brand: 'Lenovo', model: 'IdeaPad 3', serial_number: 'SN-2021-001',
+  is_reported_stolen: false, registered_at: '2021-09-01T08:00:00Z',
+  ip_address: '196.24.10.5', city: 'Kigali', country: 'Rwanda',
+  wifi_name: 'UR-Campus-WiFi', os_user: 'jp.hakizimana',
+  last_seen: new Date(Date.now() - 120000).toISOString(),
+  latitude: -1.9441, longitude: 30.0619
+};
+
+const DEMO_PINGS = [
+  { city: 'Kigali', country: 'Rwanda', wifi_name: 'UR-Campus-WiFi', ip_address: '196.24.10.5', logged_at: new Date(Date.now()-120000).toISOString(), is_suspicious: false },
+  { city: 'Kigali', country: 'Rwanda', wifi_name: 'UR-Library-WiFi', ip_address: '196.24.10.6', logged_at: new Date(Date.now()-420000).toISOString(), is_suspicious: false },
+  { city: 'Kigali', country: 'Rwanda', wifi_name: 'Home-Fibre', ip_address: '196.24.11.20', logged_at: new Date(Date.now()-7200000).toISOString(), is_suspicious: false },
+];
+
+function timeAgo(iso) {
+  const diff = Math.floor((Date.now() - new Date(iso)) / 1000);
+  if (diff < 60) return `${diff}s ago`;
+  if (diff < 3600) return `${Math.floor(diff/60)}m ago`;
+  if (diff < 86400) return `${Math.floor(diff/3600)}h ago`;
+  return `${Math.floor(diff/86400)}d ago`;
+}
+
+// ── AUTH ──
+function showRegister() { document.getElementById('loginForm').style.display='none'; document.getElementById('registerForm').style.display='block'; }
+function showLogin() { document.getElementById('registerForm').style.display='none'; document.getElementById('loginForm').style.display='block'; }
+
+function showError(msg) {
+  const el = document.getElementById('errorMsg');
+  el.textContent = msg; el.style.display = 'block';
+  setTimeout(() => el.style.display='none', 4000);
+}
+
+async function doLogin() {
+  const email = document.getElementById('loginEmail').value;
+  const password = document.getElementById('loginPassword').value;
+  if (!email || !password) return showError('Please fill in all fields.');
+  try {
+    const res = await fetch(`${API_URL}/auth/login`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({email, password})
+    });
+    const data = await res.json();
+    if (res.ok) {
+      localStorage.setItem('student_token', data.token);
+      localStorage.setItem('student_info', JSON.stringify(data.student));
+      token = data.token; currentStudent = data.student;
+      showApp();
+    } else { showError(data.error || 'Login failed.'); }
+  } catch {
+    // Demo mode
+    localStorage.setItem('student_token', 'demo');
+    localStorage.setItem('student_info', JSON.stringify({ full_name: 'Jean Paul Hakizimana', student_id: 'UR/CST/2021/001' }));
+    token = 'demo'; currentStudent = { full_name: 'Jean Paul Hakizimana', student_id: 'UR/CST/2021/001' };
+    showApp();
+  }
+}
+
+async function doRegister() {
+  const full_name = document.getElementById('regName').value;
+  const student_id = document.getElementById('regStudentId').value;
+  const email = document.getElementById('regEmail').value;
+  const college = document.getElementById('regCollege').value;
+  const password = document.getElementById('regPassword').value;
+  if (!full_name || !student_id || !email || !college || !password) return showError('Please fill in all fields.');
+  try {
+    const res = await fetch(`${API_URL}/auth/register`, {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({full_name, student_id, email, college, password})
+    });
+    const data = await res.json();
+    if (res.ok) {
+      localStorage.setItem('student_token', data.token);
+      localStorage.setItem('student_info', JSON.stringify(data.student));
+      token = data.token; currentStudent = data.student;
+      showApp();
+    } else { showError(data.error || 'Registration failed.'); }
+  } catch { showError('Could not connect to server.'); }
+}
+
+function doLogout() {
+  localStorage.removeItem('student_token'); localStorage.removeItem('student_info');
+  document.getElementById('appScreen').style.display = 'none';
+  document.getElementById('authScreen').style.display = 'flex';
+}
+
+// ── APP ──
+function showApp() {
+  document.getElementById('authScreen').style.display = 'none';
+  document.getElementById('appScreen').style.display = 'block';
+  document.getElementById('topbarStudentName').textContent = currentStudent?.full_name || 'Student';
+  loadLaptopData();
+}
+
+async function loadLaptopData() {
+  let laptop = DEMO_LAPTOP;
+  let pings = DEMO_PINGS;
+  try {
+    const res = await fetch(`${API_URL}/laptops/my`, { headers: {'Authorization': `Bearer ${token}`} });
+    if (res.ok) laptop = await res.json();
+  } catch {}
+
+  renderLaptop(laptop);
+  renderPings(pings);
+  initStudentMap(laptop);
+}
+
+function renderLaptop(l) {
+  document.getElementById('heroModel').textContent = `${l.brand} ${l.model}`;
+  document.getElementById('heroSerial').textContent = l.serial_number;
+  const heroStatus = document.getElementById('heroStatus');
+  if (l.is_reported_stolen) {
+    heroStatus.className = 'status-chip chip-stolen';
+    heroStatus.innerHTML = '<span class="pulsedot"></span> STOLEN — Tracking Active';
+  } else if (l.last_seen && (Date.now() - new Date(l.last_seen)) < 900000) {
+    heroStatus.className = 'status-chip chip-safe';
+    heroStatus.innerHTML = '<span class="pulsedot"></span> Online — Safe';
+  } else {
+    heroStatus.className = 'status-chip chip-offline';
+    heroStatus.innerHTML = 'Offline';
+  }
+  document.getElementById('infoCity').textContent = l.city || '—';
+  document.getElementById('infoCountry').textContent = l.country || '—';
+  document.getElementById('infoIP').textContent = l.ip_address || '—';
+  document.getElementById('infoWifi').textContent = l.wifi_name || '—';
+  document.getElementById('infoLastSeen').textContent = l.last_seen ? timeAgo(l.last_seen) : '—';
+  document.getElementById('infoBrand').textContent = l.brand || '—';
+  document.getElementById('infoModel').textContent = l.model || '—';
+  document.getElementById('infoSerial').textContent = l.serial_number || '—';
+  document.getElementById('infoOsUser').textContent = l.os_user || '—';
+  document.getElementById('infoRegistered').textContent = l.registered_at ? new Date(l.registered_at).toLocaleDateString() : '—';
+
+  if (l.is_reported_stolen) {
+    document.getElementById('reportBtn').textContent = 'Already Reported Stolen';
+    document.getElementById('reportBtn').classList.add('btn-disabled');
+  }
+}
+
+function renderPings(pings) {
+  const container = document.getElementById('pingHistory');
+  if (!pings || pings.length === 0) {
+    container.innerHTML = '<div style="color:var(--muted);font-size:13px;padding:12px 0">No pings yet. Install the agent on your laptop.</div>';
+    return;
+  }
+  container.innerHTML = pings.map(p => `
+    <div class="ping-item">
+      <div class="ping-dot ${p.is_suspicious ? 'bad' : ''}"></div>
+      <div class="ping-info">
+        <div class="ping-loc">${p.city || 'Unknown'}, ${p.country || 'Unknown'}</div>
+        <div class="ping-details">${p.ip_address} &middot; ${p.wifi_name || 'Unknown WiFi'} ${p.is_suspicious ? '&middot; <span style="color:var(--danger)">SUSPICIOUS</span>' : ''}</div>
+      </div>
+      <div class="ping-time">${timeAgo(p.logged_at)}</div>
+    </div>`).join('');
+}
+
+function initStudentMap(laptop) {
+  if (studentMap) { studentMap.remove(); studentMap = null; }
+  studentMap = L.map('studentMap').setView(
+    [laptop.latitude || -1.9441, laptop.longitude || 30.0619], 13
+  );
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO', maxZoom: 19
+  }).addTo(studentMap);
+  if (laptop.latitude && laptop.longitude) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="22" height="28" viewBox="0 0 22 28"><circle cx="11" cy="11" r="10" fill="#4f8ef7" fill-opacity="0.2" stroke="#4f8ef7" stroke-width="2"/><circle cx="11" cy="11" r="5" fill="#4f8ef7"/></svg>`;
+    const icon = L.divIcon({ html: svg, iconSize: [22, 28], iconAnchor: [11, 11], className: '' });
+    L.marker([laptop.latitude, laptop.longitude], { icon }).addTo(studentMap)
+      .bindPopup(`<strong>Last seen here</strong><br>${laptop.city}, ${laptop.country}`).openPopup();
+  }
+}
+
+function toggleReportForm() {
+  const form = document.getElementById('reportForm');
+  form.style.display = form.style.display === 'none' ? 'block' : 'none';
+}
+
+async function submitReport() {
+  const description = document.getElementById('reportDescription').value;
+  const last_seen_location = document.getElementById('reportLastLocation').value;
+  if (!description) return showToast('Please describe what happened.', 'danger');
+  try {
+    await fetch(`${API_URL}/laptops/report-stolen`, {
+      method: 'POST', headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'},
+      body: JSON.stringify({ device_id: 'auto', description, last_seen_location })
+    });
+  } catch {}
+  showToast('Theft report submitted! University has been notified.', 'success');
+  toggleReportForm();
+  document.getElementById('reportBtn').textContent = 'Theft Reported — Tracking Active';
+  document.getElementById('reportBtn').classList.add('btn-disabled');
+}
+
+function showToast(msg, type='success') {
+  const t = document.createElement('div');
+  t.className = `toast ${type}`; t.textContent = msg;
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 4000);
+}
+
+if (token && currentStudent) showApp();
+</script>
+</body>
+</html>
