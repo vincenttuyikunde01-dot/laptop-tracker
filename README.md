@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # 🔒 UR Laptop Tracker
 ### University of Rwanda — Anti-Theft Laptop Tracking System
 
@@ -96,3 +97,7 @@ npm start         # production
 ## 💡 Built by a UR Student, for UR Students
 This project was born from a real problem at the University of Rwanda.
 Every ping is a timestamp. Every timestamp is evidence.
+=======
+# laptop-tracker
+this is designed to track  student pc
+>>>>>>> 1180d44ff688df0aaee2bccc64eb6b5d63eb0df9
